@@ -44,6 +44,7 @@ Accents                       DEFAULT     dim         glow
   sage      Sage green        #7C9A83     #4E6354     #A3C4AB
   indigo    Deep indigo       #5A63A8     #343A63     #8790D6
   amber     Warm amber        #D9A05B     #8A6537     #F0C68C
+  ember     Muted terracotta  #B4544A                        (low / critical)
 
 Type ramp
   ink       #F2F2F0   Primary text
@@ -237,9 +238,29 @@ border.
 
 | Export | Purpose |
 | --- | --- |
-| `Screen` | Standard chrome: black background, safe-area top, optional title/subtitle, scroll container with `insets.bottom + 108` bottom padding to clear the floating tab bar |
+| `Screen` | Standard chrome: black background, safe-area top inset, optional title/subtitle, scroll container with a flat 40px bottom pad (the tab bar is a sibling and absorbs `insets.bottom` itself) |
 | `SectionLabel` | Quiet uppercase label that separates groups without drawing a rule |
 | `Card` | Elevated surface, `mx-5` |
+
+`src/components/ui/BottomSheet.tsx`:
+
+A minimal sheet — a plain RN `Modal` with a Reanimated slide and a
+drag-to-dismiss Pan gesture, no `@gorhom/bottom-sheet` dependency. The parent
+owns `visible`; a drag or backdrop tap calls `onClose`, and the Modal unmounts
+only after the close animation finishes. It re-roots gestures in its own
+`GestureHandlerRootView`, because gestures do not reach into an RN Modal from the
+app root. Used by the energy tag picker (FE-202).
+
+`src/components/energy/`:
+
+| Export | Purpose |
+| --- | --- |
+| `EnergyBattery` | 1–5 selector drawn as a battery; cells fill and colour by `ENERGY_SCALE` |
+| `EnergyCheckin` | Battery + tag `BottomSheet`, wired to the store; one tap logs |
+
+`ENERGY_SCALE` (in `tokens.ts`) is the 1→5 colour ramp — index 0 unused so a
+score is its own index. It runs muted terracotta → amber → sage, not a literal
+red→green: a legible gradient at 11pm, not a traffic light.
 
 `src/components/ui/PressableScale.tsx`:
 

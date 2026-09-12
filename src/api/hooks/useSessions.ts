@@ -10,7 +10,7 @@ import {
   getFocusMinutesForDay,
   getPendingMutations,
   getRecentSessions,
-  getTodayCheckin,
+  getTodayEnergyStats,
   insertSession,
   localDateKey,
   markSynced,
@@ -43,10 +43,13 @@ export function useFocusMinutesToday() {
   });
 }
 
-export function useTodayCheckin() {
+/** Today's averaged energy figures, straight from SQLite. The home screen reads
+ *  these from the Zustand store for a synchronous first paint; this query is here
+ *  for any surface that would rather subscribe through TanStack Query. */
+export function useTodayEnergyStats() {
   return useQuery({
     queryKey: queryKeys.energy.today,
-    queryFn: () => getTodayCheckin(),
+    queryFn: () => getTodayEnergyStats(),
   });
 }
 

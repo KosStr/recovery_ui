@@ -25,6 +25,10 @@ export const palette = {
   amberDim: '#8A6537',
   amberGlow: '#F0C68C',
 
+  // Muted terracotta for "low / critical" states — reads as a warning without
+  // the alarm-red glare that punishes a dark room.
+  ember: '#B4544A',
+
   ink: '#F2F2F0',
   inkSoft: '#A1A1A6',
   inkMute: '#6B6B72',
@@ -44,6 +48,23 @@ export const accents = {
 } as const;
 
 export type AccentKey = keyof typeof accents;
+
+/**
+ * Energy scale 1→5, from burnout to peak focus.
+ *
+ * Runs muted terracotta → amber → sage rather than a literal red-to-green ramp:
+ * the point is a legible gradient at 11pm, not a traffic light. Index 0 is
+ * unused so a 1–5 score maps to its own slot without arithmetic at the call
+ * site (`ENERGY_SCALE[score]`).
+ */
+export const ENERGY_SCALE = [
+  palette.inkGhost, // 0 — never shown; keeps the score its own index
+  palette.ember, //    1 — burnout / critical
+  '#C2803F', //        2 — low
+  palette.amber, //    3 — steady
+  '#8CA46A', //        4 — good
+  palette.sage, //     5 — peak focus
+] as const;
 
 /**
  * Tab bar chrome.

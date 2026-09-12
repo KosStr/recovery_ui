@@ -16,7 +16,7 @@ export interface SessionDto {
   id: string;
   /** Client-generated id, echoed back so we can reconcile the local row. */
   clientId: string;
-  type: 'focus' | 'break' | 'breathing' | 'nsdr' | 'detox' | 'winddown';
+  type: 'focus' | 'break' | 'breathing' | 'somatic_breathing' | 'nsdr' | 'detox' | 'winddown';
   /** ISO-8601 with offset. DateTimeOffset on the server. */
   startedAt: string;
   endedAt: string | null;

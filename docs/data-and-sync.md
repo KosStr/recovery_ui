@@ -53,7 +53,7 @@ Every focus block, break, breathing session, NSDR, detox window, wind-down.
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | TEXT PK | Client-generated UUID |
-| `type` | TEXT | `focus` `break` `breathing` `nsdr` `detox` `winddown` |
+| `type` | TEXT | `focus` `break` `breathing` `somatic_breathing` `nsdr` `detox` `winddown` |
 | `started_at` | INTEGER | ms epoch |
 | `ended_at` | INTEGER? | null while running or abandoned |
 | `planned_duration_ms` | INTEGER | What was configured |
@@ -83,6 +83,12 @@ between them is the interesting signal (how often blocks get abandoned).
 read time. Computed by `localDateKey()`, which subtracts the device offset before
 slicing the ISO string — using UTC here would put an 11pm check-in on the wrong
 day for anyone west of Greenwich.
+
+**Many rows per day (FE-202).** There is deliberately *no* unique constraint on
+`local_date`: the product tracks energy dips through the day, so each tap appends
+a row and the day's headline number is `AVG(score)` (`getTodayEnergyStats`). The
+schema always allowed this; only the app logic changed, from a one-per-day upsert
+to an append. `context` holds the quick tags as a JSON array of stable tag ids.
 
 ### `ritual_completions`
 
@@ -125,8 +131,10 @@ invalidation in one place.
 | `completeSession(id, endedAt?)` | Sets `ended_at`, computes `actual_duration_ms`, marks complete |
 | `getRecentSessions(limit)` | Newest first |
 | `getFocusMinutesForDay(dateKey)` | SUM of completed focus time for a local day |
-| `upsertEnergyCheckin(score, context?)` | One per local day; overwrites on repeat |
-| `getTodayCheckin()` | |
+| `insertEnergyCheckin(score, tags?)` | Appends a check-in; many per day |
+| `updateCheckinTags(id, tags)` | Rewrites the tag array on one row |
+| `getTodayEnergyStats()` | `{ average, count, latest }` for the local day |
+| `getLatestTodayCheckin()` | Most recent row today, or null |
 | `getEnergyTrend(days)` | |
 | `toggleRitual(key)` | Returns the new checked state |
 | `getCompletedRituals(dateKey?)` | Array of keys |
@@ -194,17 +202,28 @@ MMKV.
 
 ```ts
 {
-  todayScore: EnergyScore | null;   scoreDate: string | null;
+  // Today's energy, averaged across every check-in (FE-202)
+  todayAverage: number | null;   todayCount: number;
+  latestScore: EnergyScore | null;   energyDate: string | null;
+  lastCheckinId: string | null;  lastTags: string[];  // for the tag sheet
+
   soundscape: Soundscape;
-  detoxArmed: boolean;              detoxStartedAt: number | null;
-  breathCyclesToday: number;        breathDate: string | null;
+  detoxArmed: boolean;           detoxStartedAt: number | null;
+  breathCyclesToday: number;     breathDate: string | null;
   hydrated: boolean;
 }
 ```
 
-Every day-scoped value is paired with the date it belongs to. That is what makes
-midnight rollover possible without a scheduled job: `hydrateFromDb()` compares
-the stored date against today and clears anything stale.
+Every day-scoped value is paired with the date it belongs to (`energyDate`,
+`breathDate`). That is what makes midnight rollover possible without a scheduled
+job: `hydrateFromDb()` compares the stored date against today and clears anything
+stale, then reconciles the figures against SQLite (which wins).
+
+`logEnergy` is optimistic for the 0 ms latency AC 3 demands: it folds the new
+score into the running average synchronously, then writes the row and re-reads
+`getTodayEnergyStats` to correct rounding. The persisted store is `version: 2` —
+the shape changed from a single daily score, and the old blob is discarded rather
+than migrated since it only held one transient day's figures.
 
 ### `hydrateFromDb()`
 

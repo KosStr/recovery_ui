@@ -7,7 +7,7 @@ What each screen does, the rules behind it, and what gets written where.
 - [Фокус / Focus](#фокус-focus--apptabsfocustsx)
 - [Сон / Sleep](#сон-sleep--apptabssleeptsx)
 - [Детокс / Detox](#детокс-detox--apptabsdetoxtsx)
-- [Breathing](#breathing--appmodalbreathingtsx)
+- [Фізіологічний подих / Breathing](#фізіологічний-подих-breathing--appmodalbreathingtsx)
 
 ---
 
@@ -63,32 +63,37 @@ Dynamic Island iPhone or a gesture-navigation Android. Detail in
 
 The dashboard. One honest number, then the shortest path to changing it.
 
-### Energy check-in (1–5)
+### Energy check-in (1–5) — FE-202
 
-Five circular targets. One tap records the day.
+A horizontal **battery** selector (`src/components/energy/EnergyBattery.tsx`).
+Tapping a cell fills the battery to that level, coloured by `ENERGY_SCALE`
+(muted terracotta at 1 → sage at 5). One tap logs — no separate confirm.
 
-| Score | Label |
+| Score | Label (uk) |
 | --- | --- |
-| 1 | Depleted |
-| 2 | Low |
-| 3 | Steady |
-| 4 | Good |
-| 5 | Charged |
+| 1 | Вигорання |
+| 2 | Низька |
+| 3 | Рівна |
+| 4 | Добра |
+| 5 | Піковий фокус |
 
 **Rules:**
 
-- **One check-in per day.** A second tap on the same local date *overwrites*
-  rather than appending — the user is correcting themselves, not logging a
-  second reading. Enforced by `upsertEnergyCheckin`, which looks up by
-  `local_date` first.
-- **The write is optimistic.** `setEnergy` updates Zustand synchronously so the
-  dial responds on the same frame as the tap, then awaits the SQLite write.
-- **The score expires at midnight.** `hydrateFromDb` compares the stored
-  `scoreDate` against today's `localDateKey()` and clears it on rollover.
-- The scale is deliberately coarse. A finer one invites fiddling and produces
-  worse data.
+- **Many check-ins per day, not one.** The story tracks energy *dips through the
+  day*, so every tap is its own row (`insertEnergyCheckin`) and the headline
+  figure is the **daily average** (`getTodayEnergyStats`). This reverses the
+  earlier one-per-day upsert — see [data-and-sync.md](./data-and-sync.md#energy_checkins).
+- **Instant (AC 3).** `logEnergy` folds the new score into the running average in
+  Zustand on the tap's own frame, then writes SQLite and reconciles — 0 ms
+  perceived latency.
+- **Tags in a bottom sheet (AC 2).** Logging opens a sheet with quick chips —
+  Після кави, Втома від екрана, Сонливість, Після прогулянки. Toggling a chip
+  writes through to the row just created (`updateCheckinTags`). Tags are stored
+  by stable id, shown by Ukrainian label.
+- **Expires at midnight.** `hydrateFromDb` rolls the figures over on a date change.
 
-Written to: `energy_checkins` (SQLite) + `todayScore`/`scoreDate` (Zustand → MMKV).
+Written to: `energy_checkins` (SQLite, one row per tap, tags in `context` as a
+JSON array) + the day's average/count/latest in Zustand → MMKV.
 
 ### In-progress card
 
@@ -98,7 +103,7 @@ same MMKV row the Focus screen uses, so the two can never disagree.
 
 ### Quick reset
 
-Opens the fullscreen breathing modal. About 45 seconds.
+Opens the fullscreen somatic-breathing modal (FE-201). About 80 seconds.
 
 ### Today so far
 
@@ -108,7 +113,7 @@ Three stat tiles:
 | --- | --- |
 | Focus (min) | `getFocusMinutesForDay()` — SUM of completed focus sessions for the local day |
 | Breaths (cycles) | `breathCyclesToday` in Zustand, reset on date rollover |
-| Energy (of 5) | Today's score, or `—` |
+| Енергія (середнє) | The day's average score (`getTodayEnergyStats`), or `—` |
 
 ### On mount
 
@@ -268,36 +273,37 @@ A quest that produces a shareable artefact defeats the purpose.
 
 ---
 
-## Breathing — `app/modal/breathing.tsx`
+## Фізіологічний подих (Breathing) — `app/modal/breathing.tsx`
 
-**Accent:** sage green `#7C9A83`. Presented as a fullscreen modal sliding up
-from the bottom.
+**Accent:** sage green `#7C9A83`. Fullscreen modal sliding up from the bottom.
+Story **FE-201**. Full mechanics in [breathing.md](./breathing.md).
 
-The physiological sigh: two inhales through the nose, then a long exhale.
+Four phases — two inhales, a hold, a long exhale:
 
-| Phase | Duration | Target fullness | Haptic | Caption |
+| Phase | Duration | Radius | Haptic | Caption |
 | --- | --- | --- | --- | --- |
-| Inhale 1 | 1600 ms | 0.68 | Light | "Inhale through your nose" |
-| Inhale 2 | 700 ms | 1.0 | Rigid | "Sip a little more" |
-| Exhale | 5500 ms | 0.0 | Soft | "Long, slow exhale" |
-| Rest | 900 ms | 0.0 | — | "Rest" |
+| Вдих носом | 1500 ms | 40→85% | Rising Light ramp | "Вдих носом" |
+| Ще трохи повітря | 600 ms | 85→100% | Medium (довдих) | "Ще трохи повітря" |
+| Затримайте | 1000 ms | 100% | — (glow pulses) | "Затримайте" |
+| Повільний видих | 5000 ms | 100→40% | Light at start | "Повільний видих" |
 
-One cycle is **8.7 s**; the session is **5 cycles ≈ 45 s**, then a success
+One cycle is **8.1 s**; the session is **10 cycles ≈ 81 s**, then a success
 haptic and an auto-dismiss 1.4 s later (letting the final exhale land).
 
 **Design rules:**
 
 - **Auto-starts on mount.** The user tapped "quick reset" to breathe, not to
   read a start button.
-- **Almost nothing on screen** — an orb, one line, five dots. No timer, no
-  progress bar. Anything that invites the eye to measure progress pulls the user
-  out of the exercise.
+- **Заплющити очі (close eyes).** A full-black overlay drops over the running
+  session; the exercise is then driven by vibration alone (AC 2). A tap brings
+  the visual back without stopping it.
+- **Almost nothing on screen** — an orb, one line, ten dots. No timer, no
+  progress bar.
 - **Dots, not a percentage.** Countable at a glance, unreadable as a ratio.
-- `useKeepAwake()` prevents the screen dimming mid-exhale — a cycle passes with
-  no touch input.
-- The close button is small and low-contrast so it does not compete with the orb.
+- `useKeepAwake()` prevents the screen dimming mid-hold.
 
-Written to: a `sessions` row (`type: 'breathing'`), completed only if all five
-cycles finish; plus `breathCyclesToday` in Zustand, incremented per cycle.
+Written to: a `sessions` row (`type: 'somatic_breathing'`, AC 3), completed only
+if all ten cycles finish; plus `breathCyclesToday` in Zustand, incremented per
+cycle.
 
 Full implementation detail in [breathing.md](./breathing.md).
