@@ -1,0 +1,77 @@
+{
+  "expo": {
+    "name": "Recovery",
+    "slug": "recovery-ui",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "recovery",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.recovery.app",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio",
+          "processing"
+        ],
+        "UIViewControllerBasedStatusBarAppearance": false,
+        "NSUserNotificationsUsageDescription": "Recovery notifies you when a focus block, wind-down step, or detox window finishes — even if the app was closed."
+      }
+    },
+    "android": {
+      "package": "com.recovery.app",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7C9A83",
+          "defaultChannel": "recovery-timers"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "minSdkVersion": 24,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,26 @@
+# Normalise to LF in the repository and in the working tree.
+#
+# This project is authored on Windows but built on macOS for iOS, and Metro,
+# Babel and Prettier all assume LF. Without this, `core.autocrlf=true` on a
+# Windows clone checks files out with CRLF and every formatter run shows the
+# whole file as changed.
+* text=auto eol=lf
+
+# Generated; collapse it in diffs and reviews.
+package-lock.json linguist-generated=true -diff
+
+# Binary assets: never touch, never diff.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.mp3 binary
+*.m4a binary
+*.opus binary
+*.ogg binary
+*.mp4 binary
