@@ -23,33 +23,43 @@ the mechanism**, not a stylistic choice: a prolonged exhale is what actually
 slows heart rate. It is the one number in this file not worth tuning for
 aesthetics.
 
+FE-201 defines four phases. Radius runs 40% → 85% → 100% → 40%; `lungFullness`
+carries that as 0 → 0.75 → 1.0 → 0 (the visual maps fullness 0..1 onto radius
+40%..100%, so fullness 0.75 is 85% radius).
+
 | Phase | Duration | Fullness target | Easing | Rationale |
 | --- | --- | --- | --- | --- |
-| `inhale1` | 1600 ms | 0.68 | `out(cubic)` | Chest fills quickly, then settles |
-| `inhale2` | 700 ms | 1.00 | `linear` | Short and sharp; reads as a distinct second action |
-| `exhale` | 5500 ms | 0.00 | `inOut(quad)` | The long release; `inOut` stops it stalling at the end |
-| `rest` | 900 ms | 0.00 | `linear` | A beat of stillness, so it never feels like a metronome |
+| `inhale1` | 1500 ms | 0.75 (85% r) | `inOut(quad)` | Smooth fill; the rising haptic ramp runs across it |
+| `inhale2` | 600 ms | 1.00 (100% r) | `out(quad)` | The sharp "довдих" top-off |
+| `hold` | 1000 ms | 1.00 | `linear` | Held at full while the glow pulses |
+| `exhale` | 5000 ms | 0.00 (40% r) | `out(cubic)` | The long, soft release |
 
-One cycle: **8700 ms**. Exported as `CYCLE_MS`.
+One cycle: **8100 ms**, exported as `CYCLE_MS`.
 
-The breathing modal runs `TARGET_CYCLES = 5` — about **45 seconds** — then fires
-a success haptic and auto-dismisses 1.4 s later, letting the final exhale land.
+The modal runs `TARGET_CYCLES = 10` — about **81 seconds** — then fires a success
+haptic, writes a `somatic_breathing` session, and auto-dismisses 1.4 s later so
+the final exhale lands. Ten is the count the FE-201 acceptance criteria record.
 
 ---
 
 ## The state machine
 
-One `SharedValue` — `lungFullness`, 0 (empty) to 1 (full) — is the entire model.
-Every visual derives from it, and one `withSequence` drives it:
+Two `SharedValue`s — `lungFullness` (0..1, drives the orb's size) and `glow`
+(0..1, pulses only during the hold) — are the whole model. `lungFullness` is
+driven by one `withSequence`:
 
 ```ts
 lungFullness.value = withSequence(
-  withTiming(0.68, { duration: 1600, easing: Easing.out(Easing.cubic) }, cb),
-  withTiming(1,    { duration: 700,  easing: Easing.linear },            cb),
-  withTiming(0,    { duration: 5500, easing: Easing.inOut(Easing.quad) }, cb),
-  withTiming(0,    { duration: 900,  easing: Easing.linear },            cb),
+  withTiming(0.75, { duration: 1500, easing: Easing.inOut(Easing.quad) }, cb),
+  withTiming(1,    { duration: 600,  easing: Easing.out(Easing.quad) },   cb),
+  withTiming(1,    { duration: 1000, easing: Easing.linear },             cb), // hold
+  withTiming(0,    { duration: 5000, easing: Easing.out(Easing.cubic) },  cb),
 );
 ```
+
+`glow` is a separate `withRepeat(withSequence(...), -1, true)` started when the
+hold phase begins and cancelled at the exhale — that is the visual stand-in for
+the one phase with no haptic.
 
 The fourth segment animates to the value it already holds. That is the cheapest
 way to express "wait" inside a sequence — no timeout, no separate scheduler.
@@ -66,7 +76,7 @@ identity.
 ### Public surface
 
 ```ts
-const { lungFullness, phase, completedCycles, isRunning, start, stop }
+const { lungFullness, glow, phase, completedCycles, isRunning, start, stop }
   = useSighCycle({ targetCycles, onCycleComplete, onFinished });
 ```
 
@@ -80,7 +90,7 @@ cannot leave a sequence firing callbacks at a dead component.
 
 ## Why it runs on the UI thread
 
-React renders the breathing screen **once**. For the remaining 45 seconds it does
+React renders the breathing screen **once**. For the remaining ~80 seconds it does
 nothing.
 
 The animation lives in Reanimated worklets on the UI thread, and the Skia scene
@@ -119,15 +129,31 @@ can never disagree:
 
 | Phase | Cue | Why that one |
 | --- | --- | --- |
-| `inhale1` | `impactAsync(Light)` | The lightest possible tap — an invitation |
-| `inhale2` | `impactAsync(Rigid)` | Sharper, so the second sniff is distinct |
-| `exhale` | `impactAsync(Soft)` | Soft and diffuse; reads as "release", not "act" |
+| `inhale1` | **rising ramp** of `impactAsync(Light)` | Accelerating taps read as "keep drawing in" |
+| `inhale2` | `impactAsync(Medium)` | The sharp "довдих"; stronger than the ramp so the two inhales feel separate |
+| `hold` | *(none)* | The glow pulses instead |
+| `exhale` | `impactAsync(Light)` | One soft marker at the start of the release |
 | session end | `notificationAsync(Success)` | Completion |
 
-All of these go through `src/lib/haptics.ts`, which never throws. Every call site
-is on a UI path, and a rejected promise from a device with no taptic engine must
-not surface as an unhandled rejection mid-session. Web has no API at all, so the
+The **rising ramp** is the one piece not driven by Reanimated. `startInhaleRamp`
+schedules Light taps across the 1.5 s inhale with the gap shrinking from ~360 ms
+to ~110 ms, tracked in a ref and cleared on phase change, stop, or unmount. It
+runs on the JS thread (`setTimeout`) because it only *triggers* haptics — it
+never drives the animation, so throttling would at worst drop a tap, never
+stutter the orb.
+
+All cues go through `src/lib/haptics.ts`, which never throws. Every call site is
+on a UI path, and a rejected promise from a device with no taptic engine must not
+surface as an unhandled rejection mid-session. Web has no API at all, so the
 wrapper checks `Platform.OS` first.
+
+### Eyes-closed mode
+
+FE-201 asks for a practice done without looking at the phone. "Заплющити очі"
+sets a full-`#000000` overlay over the running session; the exercise continues,
+driven by the haptic cues above, and a tap anywhere brings the visual back
+without stopping it. This is why the haptic design carries the whole cycle on its
+own — with the screen black, vibration is the only channel left.
 
 ---
 
@@ -144,12 +170,13 @@ tablet:
 ```
 canvasSize = min(width × 0.86, 380)
 maxRadius  = canvasSize × 0.34
-minRadius  = maxRadius × 0.34      ← empty lungs still show a visible core
+minRadius  = maxRadius × 0.40      ← FE-201: the orb never shrinks below 40% r
 ringRadius = canvasSize × 0.44
 ```
 
-`minRadius` is deliberately non-zero. A fully collapsed orb reads as *stopped*
-rather than *exhaled*.
+`minRadius` is deliberately non-zero. A fully collapsed orb reads as *stopped*;
+40% reads as *exhaled, still alive*. Fullness 0..1 maps linearly onto this
+40%..100% band.
 
 ### Layers, back to front
 
@@ -209,7 +236,7 @@ This keeps the exercise tunable without a dev build.
 twice the two inhales combined; that ratio is the mechanism.
 
 **Session length** — `TARGET_CYCLES` in `app/modal/breathing.tsx`. If you change
-it, update the "About 45 seconds" copy on the Today screen
+it, update the "Близько 80 секунд" copy on the Today screen
 (`app/(tabs)/index.tsx`) and the comment above the constant. Session length is
 `CYCLE_MS × TARGET_CYCLES`.
 

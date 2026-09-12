@@ -131,8 +131,7 @@ On Node 24.19.0 / npm 11.17.0:
 | Check | Result |
 | --- | --- |
 | `npx tsc --noEmit` | clean |
-| `npx expo export --platform android` | 5.29 MB Hermes bytecode |
-| `npx expo export --platform ios` | 5.29 MB Hermes bytecode |
+| `npx expo export --platform android` | 5.31 MB Hermes bytecode |
 | `npx expo-doctor` | 18/18 checks pass |
 
 **Not verified**, because it needs macOS or a connected device: the native build
@@ -155,11 +154,10 @@ the safe-area behaviour on a Dynamic Island or gesture-navigation device.
   → [getting-started.md](./docs/getting-started.md#3-configure)
 - **Auth** — `setAuthTokenProvider` in `src/api/client.ts` is wired but unused.
 - **Sync is push-only.** Nothing reads server state back into SQLite yet.
-- **The UI is bilingual, which is not a final state.** Story FE-101 specified
-  Ukrainian tab labels, so the shell reads Енергія / Фокус / Сон / Детокс while
-  every screen inside is still English. Strings are hardcoded at their use sites;
-  wiring up `expo-localization` + `i18n-js` and extracting them is its own piece
-  of work.
+- **The UI is bilingual, which is not a final state.** The shell and the whole
+  Home tab (FE-101, FE-201, FE-202) are Ukrainian; Focus / Sleep / Detox are
+  still English. Strings are hardcoded at their use sites; wiring up
+  `expo-localization` + `i18n-js` and extracting them is its own piece of work.
 - **App icon and splash image** — `assets/` is empty; `app.json` ships a plain
   black splash.
 - **Known risk:** `react-native-track-player` is listed as unsupported on the New
