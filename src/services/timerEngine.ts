@@ -41,12 +41,13 @@ export interface ActiveTimer {
 
 const NOTIFICATION_COPY: Record<TimerKind, { title: string; body: string }> = {
   focus: {
-    title: 'Block complete',
-    body: 'Ninety minutes done. Stand up and look at something far away.',
+    // FE-301 AC1: the exact wording the acceptance criteria specify.
+    title: '90 хв фокусу завершено!',
+    body: 'Відійдіть від екрана. Час на перерву.',
   },
   break: {
-    title: 'Break over',
-    body: 'Twenty minutes of recovery banked. Ready for the next block?',
+    title: 'Перерва завершена',
+    body: 'Готові до наступного блоку фокусу?',
   },
   detox: {
     title: 'Screen-free window finished',

@@ -133,6 +133,10 @@ Ultradian rhythm: a 90-minute block of work, then 20 minutes of genuine rest.
 ULTRADIAN = { focusMs: 90 * 60 * 1000, breakMs: 20 * 60 * 1000 }
 ```
 
+The screen is Ukrainian, consistent with the FE-101 shell, and **nothing here
+blocks**: the break is offered, never forced, and the rest hints are advice, not
+a takeover.
+
 ### Starting a block
 
 1. Insert a `sessions` row (`type: 'focus' | 'break'`, `sync_state: 'pending'`).
@@ -143,11 +147,24 @@ ULTRADIAN = { focusMs: 90 * 60 * 1000, breakMs: 20 * 60 * 1000 }
 3. For a focus block only, start the selected soundscape. **Breaks play nothing** —
    a break is for rest, not more input.
 
-### The countdown
+### The ring (FE-301)
 
-Derived, never counted. See [timers.md](./timers.md). Progress is a single
-3px hairline rule rather than a ring: less to look at, and readable at a glance
-from across a desk.
+A minimalist **Skia ring** with the time in the middle (`FocusRing`), not the
+old hairline bar. Derived, never counted — see [timers.md](./timers.md#the-focus-ring-fe-301)
+for the arc, the smoothing, and the Expo Go fallback. Caption reads `ФОКУС`,
+`ПЕРЕРВА`, or `ГОТОВІ`; the arc and time turn sage during a break.
+
+### The rest phase (AC3)
+
+When a focus block finishes, a **dismissible** card offers the 20-minute break —
+one tap starts it, an X waves it off, and the normal start buttons stay put. It
+is a nudge, not a modal.
+
+During a break the screen shows an **analog rest hint** — «Подивіться у вікно на
+обрій 2 хвилини» and two alternates, picked by the break's start minute — plus a
+soft line that the screen can be switched off (we can't lock it for you; the OS
+forbids that, and the completion notification will fire regardless). No
+soundscape plays over a break.
 
 ### Transport
 
@@ -164,8 +181,9 @@ the block was started and abandoned.
 
 `useCountdown(handleComplete)` fires once per timer id on the first tick that
 observes zero — including the tick forced by returning to the foreground. It
-fires a success haptic, marks the session row complete, stops audio, and clears
-the timer.
+fires a success haptic, marks the session row complete, stops audio, clears the
+timer, and — when a *focus* block finished — raises the dismissible break offer
+above.
 
 ### Soundscape selection
 
