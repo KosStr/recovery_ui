@@ -18,14 +18,21 @@ function safe(run: () => Promise<void>): void {
 }
 
 export const haptics = {
-  /** First inhale of the physiological sigh — the lightest possible tap. */
+  /**
+   * A single light tap. Used both as the pulse of the rising inhale ramp and as
+   * the soft marker at the start of the exhale (FE-201 phases 1 and 4).
+   */
   inhalePrimary: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
 
-  /** Second, shorter sniff that tops off the lungs. Distinctly sharper. */
-  inhaleSecondary: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid)),
+  /**
+   * The second, sharper inhale — the "довдих" that tops off the lungs. FE-201
+   * specifies a distinct Medium impact here, stronger than the ramp preceding
+   * it so the two inhales feel like separate actions with the eyes closed.
+   */
+  inhaleSecondary: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
 
   /** Long exhale. Soft and diffuse so it reads as "release", not "act". */
-  exhale: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)),
+  exhale: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
 
   /** Discrete UI selection: energy dial, tab, checklist item. */
   select: () => safe(() => Haptics.selectionAsync()),

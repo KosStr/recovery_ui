@@ -223,6 +223,7 @@ stripe of dead space under every screen.
 | `src/api/hooks/useSessions.ts` | Every hook a screen is allowed to call |
 | `src/components/breathing/useSighCycle.ts` | The breath state machine. See [breathing.md](./breathing.md) |
 | `src/components/breathing/PhysiologicalSigh.tsx` | Skia canvas + Reanimated fallback |
+| `src/components/focus/FocusRing.tsx` | Skia focus-timer ring + fallback. See [timers.md](./timers.md#the-focus-ring-fe-301) |
 | `src/components/ui/Screen.tsx` | `Screen`, `SectionLabel`, `Card` |
 | `src/components/ui/icons.ts` | Every Lucide icon the app uses, deep-imported. See [design-system.md](./design-system.md#icons) |
 | `src/components/ui/PressableScale.tsx` | Spring press feedback + haptic |

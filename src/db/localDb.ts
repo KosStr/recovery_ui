@@ -17,7 +17,14 @@ import * as SQLite from 'expo-sqlite';
 export const db = SQLite.openDatabaseSync('recovery.db');
 
 export type SyncState = 'pending' | 'synced' | 'conflict';
-export type SessionType = 'focus' | 'break' | 'breathing' | 'nsdr' | 'detox' | 'winddown';
+export type SessionType =
+  | 'focus'
+  | 'break'
+  | 'breathing'
+  | 'somatic_breathing'
+  | 'nsdr'
+  | 'detox'
+  | 'winddown';
 
 export interface SessionRow {
   id: string;
@@ -199,53 +206,100 @@ export async function getFocusMinutesForDay(dateKey = localDateKey()): Promise<n
 // --- Energy check-ins ------------------------------------------------------
 
 /**
- * Writes today's score. One check-in per day is the product rule, so a repeat
- * on the same day overwrites rather than appending -- the user is correcting
- * themselves, not logging a second reading.
+ * Appends a check-in. FE-202 tracks energy *through the day* — the dips after
+ * lunch, the crash after a screen binge — so every tap is its own row rather
+ * than overwriting an earlier one. The day's headline number is the average of
+ * these rows (see `getTodayEnergyStats`), not the latest.
+ *
+ * `context` carries the quick tags as a JSON array of strings; the helpers
+ * below encode and decode it so no call site has to know the wire shape.
  */
-export async function upsertEnergyCheckin(score: number, context?: string): Promise<string> {
-  const dateKey = localDateKey();
-  const existing = await db.getFirstAsync<{ id: string }>(
-    'SELECT id FROM energy_checkins WHERE local_date = ?',
-    dateKey,
-  );
-
-  if (existing) {
-    await db.runAsync(
-      `UPDATE energy_checkins
-          SET score = ?, recorded_at = ?, context = ?, sync_state = 'pending'
-        WHERE id = ?`,
-      score,
-      Date.now(),
-      context ?? null,
-      existing.id,
-    );
-    return existing.id;
-  }
-
+export async function insertEnergyCheckin(score: number, tags?: string[]): Promise<string> {
   const id = localId();
   await db.runAsync(
     `INSERT INTO energy_checkins (id, score, local_date, recorded_at, context, sync_state)
      VALUES (?, ?, ?, ?, ?, 'pending')`,
     id,
     score,
-    dateKey,
+    localDateKey(),
     Date.now(),
-    context ?? null,
+    encodeTags(tags),
   );
   return id;
 }
 
-export async function getTodayCheckin(): Promise<EnergyCheckinRow | null> {
+/**
+ * Replaces the tags on an existing check-in. The tag bottom-sheet writes
+ * through this as the user toggles chips, so the row and the UI never drift.
+ * Re-flags the row `pending` so the edit is picked up by the next sync.
+ */
+export async function updateCheckinTags(id: string, tags: string[]): Promise<void> {
+  await db.runAsync(
+    `UPDATE energy_checkins SET context = ?, sync_state = 'pending' WHERE id = ?`,
+    encodeTags(tags),
+    id,
+  );
+}
+
+export function encodeTags(tags?: string[] | null): string | null {
+  return tags && tags.length > 0 ? JSON.stringify(tags) : null;
+}
+
+export function decodeTags(context: string | null): string[] {
+  if (!context) return [];
+  try {
+    const parsed = JSON.parse(context);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The most recent check-in today, or null. Used to seed the store and to
+ *  target tag edits at the row the user just created. */
+export async function getLatestTodayCheckin(): Promise<EnergyCheckinRow | null> {
   return db.getFirstAsync<EnergyCheckinRow>(
-    'SELECT * FROM energy_checkins WHERE local_date = ?',
+    'SELECT * FROM energy_checkins WHERE local_date = ? ORDER BY recorded_at DESC LIMIT 1',
+    localDateKey(),
+  );
+}
+
+export interface TodayEnergyStats {
+  /** Rounded-to-one-decimal mean of today's scores, or null with no readings. */
+  average: number | null;
+  count: number;
+  /** Score of the most recent reading, or null. */
+  latest: number | null;
+}
+
+export async function getTodayEnergyStats(): Promise<TodayEnergyStats> {
+  const row = await db.getFirstAsync<{ avg: number | null; n: number; latest: number | null }>(
+    `SELECT AVG(score) AS avg,
+            COUNT(*)   AS n,
+            (SELECT score FROM energy_checkins
+              WHERE local_date = ? ORDER BY recorded_at DESC LIMIT 1) AS latest
+       FROM energy_checkins
+      WHERE local_date = ?`,
+    localDateKey(),
+    localDateKey(),
+  );
+  return {
+    average: row?.avg != null ? Math.round(row.avg * 10) / 10 : null,
+    count: row?.n ?? 0,
+    latest: row?.latest ?? null,
+  };
+}
+
+export async function getTodayCheckins(): Promise<EnergyCheckinRow[]> {
+  return db.getAllAsync<EnergyCheckinRow>(
+    'SELECT * FROM energy_checkins WHERE local_date = ? ORDER BY recorded_at ASC',
     localDateKey(),
   );
 }
 
 export async function getEnergyTrend(days = 7): Promise<EnergyCheckinRow[]> {
   return db.getAllAsync<EnergyCheckinRow>(
-    'SELECT * FROM energy_checkins ORDER BY local_date DESC LIMIT ?',
+    'SELECT * FROM energy_checkins ORDER BY local_date DESC, recorded_at DESC LIMIT ?',
     days,
   );
 }

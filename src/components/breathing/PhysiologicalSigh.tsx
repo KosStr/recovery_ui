@@ -3,6 +3,7 @@ import { View, useWindowDimensions } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useDerivedValue,
+  useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
 
@@ -35,8 +36,10 @@ try {
 export const isSkiaAvailable = Skia !== null;
 
 export interface PhysiologicalSighProps {
-  /** 0 (lungs empty) to 1 (lungs full). Owned by `useSighCycle`. */
+  /** 0 (40% radius) to 1 (100% radius). Owned by `useSighCycle`. */
   lungFullness: SharedValue<number>;
+  /** 0..1 hold-phase pulse. Optional; brightens and swells the halo when set. */
+  glow?: SharedValue<number>;
   phase: BreathPhase;
   /** Accent the orb is painted in. Defaults to sage. */
   accent?: string;
@@ -46,11 +49,17 @@ export interface PhysiologicalSighProps {
 
 export function PhysiologicalSigh({
   lungFullness,
+  glow,
   phase,
   accent = palette.sage,
   size,
 }: PhysiologicalSighProps) {
   const { width } = useWindowDimensions();
+
+  // Always create a shared value so hook order is stable; fall back to it when
+  // the caller does not drive the glow.
+  const internalGlow = useSharedValue(0);
+  const glowValue = glow ?? internalGlow;
 
   // The canvas is square and sized off the narrower viewport axis so the orb
   // never clips on a small phone or stretch on a tablet.
@@ -61,9 +70,9 @@ export function PhysiologicalSigh({
     const maxRadius = canvasSize * 0.34;
     return {
       maxRadius,
-      // Empty lungs still show a visible core -- a fully collapsed orb reads as
-      // "stopped" rather than "exhaled".
-      minRadius: maxRadius * 0.34,
+      // FE-201: the orb never shrinks below 40% radius. An empty orb reads as
+      // "stopped"; 40% reads as "exhaled, still alive".
+      minRadius: maxRadius * 0.4,
       ringRadius: canvasSize * 0.44,
     };
   }, [canvasSize]);
@@ -76,9 +85,13 @@ export function PhysiologicalSigh({
   );
 
   // The halo leads the orb slightly and fades as the lungs empty, so an exhale
-  // reads as heat leaving the body rather than a shape merely shrinking.
-  const haloRadius = useDerivedValue(() => orbRadius.value * 1.42);
-  const haloOpacity = useDerivedValue(() => 0.12 + lungFullness.value * 0.34);
+  // reads as heat leaving the body rather than a shape merely shrinking. During
+  // the hold, `glow` swells and brightens it -- the visual stand-in for the
+  // phase that has no haptic.
+  const haloRadius = useDerivedValue(() => orbRadius.value * (1.42 + glowValue.value * 0.12));
+  const haloOpacity = useDerivedValue(
+    () => 0.12 + lungFullness.value * 0.34 + glowValue.value * 0.22,
+  );
 
   // Guide ring holds a faint constant presence and brightens at full inhale, so
   // the peak of the sniff is legible without looking at the caption.
@@ -95,6 +108,7 @@ export function PhysiologicalSigh({
     return (
       <FallbackOrb
         lungFullness={lungFullness}
+        glow={glowValue}
         accent={accent}
         canvasSize={canvasSize}
         maxRadius={maxRadius}
@@ -164,12 +178,14 @@ export function PhysiologicalSigh({
  */
 function FallbackOrb({
   lungFullness,
+  glow,
   accent,
   canvasSize,
   maxRadius,
   minRadius,
 }: {
   lungFullness: SharedValue<number>;
+  glow: SharedValue<number>;
   accent: string;
   canvasSize: number;
   maxRadius: number;
@@ -188,8 +204,8 @@ function FallbackOrb({
   const haloStyle = useAnimatedStyle(() => {
     const radius = minRadius + lungFullness.value * (maxRadius - minRadius);
     return {
-      transform: [{ scale: (radius * 1.42) / maxRadius }],
-      opacity: 0.1 + lungFullness.value * 0.2,
+      transform: [{ scale: (radius * (1.42 + glow.value * 0.12)) / maxRadius }],
+      opacity: 0.1 + lungFullness.value * 0.2 + glow.value * 0.2,
     };
   });
 

@@ -21,6 +21,7 @@ export { default as CircleX } from 'lucide-react-native/icons/circle-x';
 export { default as Coffee } from 'lucide-react-native/icons/coffee';
 export { default as CupSoda } from 'lucide-react-native/icons/cup-soda';
 export { default as Eye } from 'lucide-react-native/icons/eye';
+export { default as EyeOff } from 'lucide-react-native/icons/eye-off';
 export { default as Footprints } from 'lucide-react-native/icons/footprints';
 export { default as Leaf } from 'lucide-react-native/icons/leaf';
 export { default as Moon } from 'lucide-react-native/icons/moon';
