@@ -250,3 +250,54 @@ export async function fadeOutAndStop(durationMs = 4000): Promise<void> {
   await TrackPlayer.reset();
   await TrackPlayer.setVolume(startVolume);
 }
+
+// --- Playback state --------------------------------------------------------
+//
+// The Sleep player needs to reflect play/pause *including changes made from the
+// lock screen*, so it subscribes to the player's own state rather than trusting
+// its last in-app action. All of this no-ops when the native module is absent.
+
+type PlaybackListener = (isPlaying: boolean) => void;
+const playbackListeners = new Set<PlaybackListener>();
+let isPlaying = false;
+let stateSubscribed = false;
+
+function emitPlayback(next: boolean): void {
+  isPlaying = next;
+  playbackListeners.forEach((fn) => fn(next));
+}
+
+/** Best-effort current state; false when audio is unavailable. */
+export function getIsPlaying(): boolean {
+  return isPlaying;
+}
+
+/**
+ * Subscribes to play/pause changes. Wires the underlying TrackPlayer state event
+ * on first use. Returns an unsubscribe. On a platform without the native module
+ * the listener simply never fires.
+ */
+export function addPlaybackListener(listener: PlaybackListener): () => void {
+  playbackListeners.add(listener);
+
+  const mod = loadModule();
+  if (mod && !stateSubscribed) {
+    stateSubscribed = true;
+    const { State, Event } = mod;
+    mod.default.addEventListener(Event.PlaybackState, ({ state }: { state: unknown }) => {
+      emitPlayback(state === State.Playing || state === State.Buffering);
+    });
+  }
+
+  return () => {
+    playbackListeners.delete(listener);
+  };
+}
+
+/** Play if paused, pause if playing. Mirrors the lock-screen toggle in-app. */
+export async function togglePlayback(): Promise<void> {
+  const mod = loadModule();
+  if (!mod || !setupPromise) return;
+  if (isPlaying) await mod.default.pause();
+  else await mod.default.play();
+}
