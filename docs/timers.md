@@ -9,8 +9,20 @@
 - [Pausing without drift](#pausing-without-drift)
 - [The React binding](#the-react-binding)
 - [Notifications](#notifications)
+- [The focus ring (FE-301)](#the-focus-ring-fe-301)
 - [Testing that it survives](#testing-that-it-survives)
 - [Extending it](#extending-it)
+
+---
+
+> **FE-301 mapping.** The Ultradian 90/20 timer is this engine, unchanged.
+> AC1 (persist `targetEndTime` in MMKV + schedule an OS notification) is
+> [Lifecycle](#lifecycle) and [Notifications](#notifications); the notification
+> copy is the Ukrainian in the table below. **AC2 (return after 40 minutes with
+> no catch-up ticks) needs no new code** — it is exactly what
+> [The approach](#the-approach) already guarantees. AC3 (the rest phase) and the
+> Skia ring UI live on the screen, in [features.md](./features.md#фокус-focus--apptabsfocustsx)
+> and [the ring section below](#the-focus-ring-fe-301).
 
 ---
 
@@ -242,8 +254,8 @@ Per-kind copy lives in `NOTIFICATION_COPY` in `timerEngine.ts`:
 
 | Kind | Title | Body |
 | --- | --- | --- |
-| `focus` | Block complete | Ninety minutes done. Stand up and look at something far away. |
-| `break` | Break over | Twenty minutes of recovery banked. Ready for the next block? |
+| `focus` | 90 хв фокусу завершено! | Відійдіть від екрана. Час на перерву. |
+| `break` | Перерва завершена | Готові до наступного блоку фокусу? |
 | `detox` | Screen-free window finished | You stayed off the glass. Log how it felt. |
 | `winddown` | Wind-down starts now | Lights down, screens away. Sleep pressure is highest right now. |
 
@@ -258,6 +270,31 @@ id.
   `defaultChannel: "recovery-timers"`
 - Android: `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `WAKE_LOCK`, `VIBRATE`
 - iOS: `NSUserNotificationsUsageDescription`
+
+---
+
+## The focus ring (FE-301)
+
+`src/components/focus/FocusRing.tsx`. A Skia progress ring with the time in the
+middle — the whole focus visual, replacing the earlier hairline bar.
+
+- **Skia arc.** One circle `Path`, drawn twice: a faint full-circle track and an
+  accent arc trimmed by the `<Path end>` prop (0..1). A −90° `Group` rotation
+  starts the arc at twelve o'clock. `strokeCap="round"`.
+- **Smoothed progress.** `useCountdown` steps `progress` once a second; the ring
+  would jump. `FocusRing` eases an internal SharedValue toward each new value
+  with a ~950 ms linear `withTiming`, so the arc glides on the UI thread while
+  the JS thread sits idle between ticks. A shrinking target (a reset or a new
+  block) snaps instead of unwinding.
+- **Time in the centre** is a plain RN `<Text>` (`formatDuration`, so `1:29:59`
+  for a 90-minute block — readable beats a rigid `89:59`), not Skia text, which
+  would mean loading a font for no gain.
+- **Fallback.** Skia is absent in Expo Go, so a plain bordered circle + the
+  centred time + a hairline bar stands in — same `isSkiaAvailable` guard as the
+  breathing orb. The arc is the only thing lost.
+
+The rest phase (AC3) and the non-blocking break offer are the Focus screen's job,
+documented in [features.md](./features.md#фокус-focus--apptabsfocustsx).
 
 ---
 

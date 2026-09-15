@@ -1,10 +1,11 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { useCompleteSession, useStartSession } from '@/api/hooks/useSessions';
+import { FocusRing } from '@/components/focus/FocusRing';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Card, Screen, SectionLabel } from '@/components/ui/Screen';
-import { Coffee, Pause, Play, X, type LucideIcon } from '@/components/ui/icons';
+import { Coffee, Eye, Moon, Pause, Play, X, type LucideIcon } from '@/components/ui/icons';
 import { haptics } from '@/lib/haptics';
 import { pausePlayback, playSoundscape, stopPlayback } from '@/services/audioPlayer';
 import {
@@ -15,21 +16,32 @@ import {
   useTimerControls,
   type ActiveTimer,
 } from '@/services/timerEngine';
-import {
-  SOUNDSCAPE_LABELS,
-  useEnergyStore,
-  type Soundscape,
-} from '@/store/useEnergyStore';
+import { SOUNDSCAPE_LABELS, useEnergyStore, type Soundscape } from '@/store/useEnergyStore';
 import { accents, layout, palette } from '@/theme/tokens';
 
 const SOUNDSCAPES = Object.keys(SOUNDSCAPE_LABELS) as Soundscape[];
 
 /**
+ * Analog rest prompts for the break phase (FE-301 AC3). All screen-free, all
+ * optional — the horizon gaze is the one the spec names. One is picked per break
+ * by its start minute, so it is stable while a break runs but varies over time.
+ */
+const REST_HINTS: { icon: LucideIcon; text: string }[] = [
+  { icon: Eye, text: 'Подивіться у вікно на обрій 2 хвилини' },
+  { icon: Coffee, text: 'Налийте води й повільно випийте' },
+  { icon: Moon, text: 'Заплющте очі на хвилину' },
+];
+
+/**
  * Ultradian focus: a 90-minute block, then 20 minutes of genuine rest.
  *
- * The countdown is read from `targetEndTimestamp`, so backgrounding the app,
- * locking the phone, or having the OS kill the process entirely does not change
- * when the block ends. The number on screen is always derived, never counted.
+ * The countdown is read from `targetEndTimestamp` (FE-301 AC1/AC2), so
+ * backgrounding, locking, or an OS kill never changes when the block ends — the
+ * number is always derived, never counted, and returning after 40 minutes shows
+ * the right time on the first frame with no catch-up ticks.
+ *
+ * Nothing here blocks: the break is *offered* after a focus block, never forced;
+ * the rest hints are informational; the screen is free to dim during a break.
  */
 export default function FocusScreen() {
   const { timer, remaining, progress, isRunning, isPaused } = useCountdown(handleComplete);
@@ -41,9 +53,9 @@ export default function FocusScreen() {
   const { mutateAsync: startSession } = useStartSession();
   const { mutate: completeSessionRow } = useCompleteSession();
 
-  // The SQLite row id for the block currently running, so completion can close
-  // the same row the start opened.
   const sessionIdRef = useRef<string | null>(null);
+  // A gentle, dismissible nudge shown after a focus block finishes.
+  const [suggestBreak, setSuggestBreak] = useState(false);
 
   function handleComplete(finished: ActiveTimer) {
     haptics.success();
@@ -53,13 +65,15 @@ export default function FocusScreen() {
     }
     void stopPlayback();
     clearCompletedTimer();
-    void finished;
+    // Offer the recovery break after focus; clear the offer after a break.
+    setSuggestBreak(finished.kind === 'focus');
   }
 
   const begin = useCallback(
     async (kind: 'focus' | 'break') => {
+      setSuggestBreak(false);
       const durationMs = kind === 'focus' ? ULTRADIAN.focusMs : ULTRADIAN.breakMs;
-      const label = kind === 'focus' ? 'Deep work block' : 'Recovery break';
+      const label = kind === 'focus' ? 'Блок фокусу' : 'Відпочинок';
 
       // Open the local row first: if the notification schedule fails (denied
       // permission), the session is still recorded.
@@ -71,7 +85,7 @@ export default function FocusScreen() {
 
       await controls.start(kind, label, durationMs);
 
-      // A break is for rest, not for more input; no bed plays over it.
+      // A break is for rest, not more input; no bed plays over it.
       if (kind === 'focus') void playSoundscape(soundscape);
     },
     [controls, soundscape, startSession],
@@ -81,115 +95,146 @@ export default function FocusScreen() {
     await controls.cancel();
     await stopPlayback();
     sessionIdRef.current = null;
+    setSuggestBreak(false);
   }, [controls]);
 
-  const accent = timer?.kind === 'break' ? palette.sage : accents.focus;
+  const isBreak = timer?.kind === 'break';
+  const isFocusRunning = isRunning && timer?.kind === 'focus';
+  const accent = isBreak ? palette.sage : accents.focus;
+
+  const restHint = useMemo(() => {
+    const index = timer ? Math.floor(timer.startedAt / 60000) % REST_HINTS.length : 0;
+    // Non-null: REST_HINTS is a statically non-empty array.
+    return (REST_HINTS[index] ?? REST_HINTS[0])!;
+  }, [timer]);
+  const RestIcon = restHint.icon;
 
   return (
-    <Screen title="Focus" subtitle="Ninety minutes on, twenty minutes off.">
-      {/* --- Countdown --- */}
-      <Card className="mb-6 items-center py-8">
-        <Text className="text-[11px] uppercase tracking-[1.6px] text-ink-mute">
-          {timer ? timer.label : 'No block running'}
-        </Text>
-
-        <Text
-          className="mt-3 text-[64px] font-extralight tracking-tighter"
-          style={{ color: timer ? accent : palette.inkGhost, fontVariant: ['tabular-nums'] }}
-        >
-          {formatDuration(timer ? remaining : ULTRADIAN.focusMs)}
-        </Text>
-
-        {/* Progress as a single hairline rule rather than a ring: less to look
-            at, and it reads correctly at a glance from across a desk. */}
-        <View className="mt-5 h-[3px] w-full overflow-hidden rounded-pill bg-hairline">
-          <View
-            className="h-full rounded-pill"
-            style={{ width: `${Math.round(progress * 100)}%`, backgroundColor: accent }}
-          />
-        </View>
-
-        {isPaused ? (
-          <Text className="mt-4 text-[13px] text-amber">Paused</Text>
-        ) : null}
-      </Card>
+    <Screen title="Фокус" subtitle="90 хвилин праці, 20 хвилин відпочинку.">
+      {/* --- Ring --- */}
+      <View className="mb-6 items-center">
+        <FocusRing
+          progress={timer ? progress : 0}
+          label={formatDuration(timer ? remaining : ULTRADIAN.focusMs)}
+          caption={isBreak ? 'ПЕРЕРВА' : isFocusRunning ? 'ФОКУС' : 'ГОТОВІ'}
+          accent={timer ? accent : palette.inkGhost}
+          paused={isPaused}
+        />
+      </View>
 
       {/* --- Transport --- */}
       {timer ? (
         <View className="mx-5 mb-6 flex-row gap-3">
-          <ControlButton
-            icon={isPaused ? Play : Pause}
-            label={isPaused ? 'Resume' : 'Pause'}
-            accent={accent}
-            onPress={async () => {
-              if (isPaused) {
-                await controls.resume();
-                if (timer.kind === 'focus') void playSoundscape(soundscape);
-              } else {
-                await controls.pause();
-                await pausePlayback();
-              }
-            }}
-          />
-          <ControlButton icon={X} label="End" accent={palette.inkMute} onPress={onCancel} />
+          {!isBreak ? (
+            <ControlButton
+              icon={isPaused ? Play : Pause}
+              label={isPaused ? 'Продовжити' : 'Пауза'}
+              accent={accent}
+              onPress={async () => {
+                if (isPaused) {
+                  await controls.resume();
+                  void playSoundscape(soundscape);
+                } else {
+                  await controls.pause();
+                  await pausePlayback();
+                }
+              }}
+            />
+          ) : null}
+          <ControlButton icon={X} label="Завершити" accent={palette.inkMute} onPress={onCancel} />
         </View>
       ) : (
         <View className="mx-5 mb-6 flex-row gap-3">
-          <ControlButton
-            icon={Play}
-            label="90 min focus"
-            accent={accents.focus}
-            onPress={() => void begin('focus')}
-          />
-          <ControlButton
-            icon={Coffee}
-            label="20 min break"
-            accent={palette.sage}
-            onPress={() => void begin('break')}
-          />
+          <ControlButton icon={Play} label="90 хв фокусу" accent={accents.focus} onPress={() => void begin('focus')} />
+          <ControlButton icon={Coffee} label="20 хв перерва" accent={palette.sage} onPress={() => void begin('break')} />
         </View>
       )}
 
-      {/* --- Soundscape --- */}
-      <SectionLabel>Soundscape</SectionLabel>
-      <View className="mx-5 flex-row flex-wrap gap-2">
-        {SOUNDSCAPES.map((option) => {
-          const selected = soundscape === option;
-          return (
-            <PressableScale
-              key={option}
-              onPress={() => {
-                setSoundscape(option);
-                // Swap the bed live so the choice is audible immediately, but
-                // only while a focus block is actually running.
-                if (isRunning && timer?.kind === 'focus') void playSoundscape(option);
-              }}
-              scaleTo={0.94}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-            >
+      {/* --- Break suggestion after a focus block. Dismissible, never forced. --- */}
+      {suggestBreak && !timer ? (
+        <PressableScale onPress={() => void begin('break')} haptic="none">
+          <Card className="mb-6">
+            <View className="flex-row items-center">
               <View
-                className="rounded-pill border px-4 py-2.5"
-                style={{
-                  borderColor: selected ? accents.focus : palette.hairline,
-                  backgroundColor: selected ? `${accents.focus}1F` : 'transparent',
-                }}
+                className="h-11 w-11 items-center justify-center rounded-pill"
+                style={{ backgroundColor: `${palette.sage}1F` }}
               >
-                <Text
-                  className="text-[13px] font-medium"
-                  style={{ color: selected ? accents.focus : palette.inkSoft }}
-                >
-                  {SOUNDSCAPE_LABELS[option]}
+                <Coffee size={20} strokeWidth={layout.iconStroke} color={palette.sage} />
+              </View>
+              <View className="ml-4 flex-1">
+                <Text className="text-[15px] font-semibold text-ink">Блок завершено — час на перерву?</Text>
+                <Text className="mt-0.5 text-[13px] text-ink-soft">20 хвилин, щоб відновитися.</Text>
+              </View>
+              <PressableScale onPress={() => setSuggestBreak(false)} hitSlop={12}>
+                <X size={18} strokeWidth={layout.iconStroke} color={palette.inkMute} />
+              </PressableScale>
+            </View>
+          </Card>
+        </PressableScale>
+      ) : null}
+
+      {/* --- Rest phase: analog hint + a soft screen-off suggestion (AC3). --- */}
+      {isBreak ? (
+        <>
+          <SectionLabel>Відпочинок</SectionLabel>
+          <Card className="mb-4">
+            <View className="flex-row items-start">
+              <View
+                className="h-11 w-11 items-center justify-center rounded-pill"
+                style={{ backgroundColor: `${palette.sage}1F` }}
+              >
+                <RestIcon size={20} strokeWidth={layout.iconStroke} color={palette.sage} />
+              </View>
+              <View className="ml-4 flex-1">
+                <Text className="text-[16px] font-semibold leading-[22px] text-ink">{restHint.text}</Text>
+                <Text className="mt-1.5 text-[13px] leading-[19px] text-ink-mute">
+                  Можна вимкнути екран — ми сповістимо, коли перерва завершиться.
                 </Text>
               </View>
-            </PressableScale>
-          );
-        })}
-      </View>
+            </View>
+          </Card>
+        </>
+      ) : null}
+
+      {/* --- Soundscape: focus and idle only; a break stays quiet. --- */}
+      {!isBreak ? (
+        <>
+          <SectionLabel>Звук</SectionLabel>
+          <View className="mx-5 flex-row flex-wrap gap-2">
+            {SOUNDSCAPES.map((option) => {
+              const selected = soundscape === option;
+              return (
+                <PressableScale
+                  key={option}
+                  onPress={() => {
+                    setSoundscape(option);
+                    if (isFocusRunning) void playSoundscape(option);
+                  }}
+                  scaleTo={0.94}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                >
+                  <View
+                    className="rounded-pill border px-4 py-2.5"
+                    style={{
+                      borderColor: selected ? accents.focus : palette.hairline,
+                      backgroundColor: selected ? `${accents.focus}1F` : 'transparent',
+                    }}
+                  >
+                    <Text className="text-[13px] font-medium" style={{ color: selected ? accents.focus : palette.inkSoft }}>
+                      {SOUNDSCAPE_LABELS[option]}
+                    </Text>
+                  </View>
+                </PressableScale>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
 
       <Text className="mx-5 mt-4 text-[12px] leading-[18px] text-ink-mute">
-        Audio keeps playing with the screen off and appears on the lock screen. The block finishes
-        on time even if you close the app.
+        Таймер завершиться вчасно, навіть якщо згорнути додаток або вимкнути екран — ми надішлемо
+        сповіщення.
       </Text>
     </Screen>
   );
