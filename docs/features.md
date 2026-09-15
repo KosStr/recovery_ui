@@ -174,55 +174,52 @@ immediately. The selection persists in Zustand. See [audio.md](./audio.md).
 
 **Accent:** light indigo `#8790D6`
 
-The hour before bed, treated as the actual intervention.
+The circadian sleep hub (EPIC 4). Three stacked concerns, each its own
+component: `CircadianPanel`, `SleepPlayer`, `WindDownChecklist`.
 
-### Caffeine cutoff
+### Circadian widget — caffeine cutoff & digital sunset (FE-402)
 
-Derived rather than asked for. Working backwards from target bedtime:
+Everything derives from one number, the **target bedtime**, set with a −/+ 30-min
+stepper (clamped 20:00–23:30, default 23:00, stored in `StorageKeys.sleepTarget`):
 
 ```
-cutoff = bedtime − 10 hours
+caffeineCutoff = targetSleep − 9h   (adenosine can rebuild before bed)
+digitalSunset  = targetSleep − 1h   (melatonin is not suppressed by light)
 ```
 
-With the default bedtime of 23:00, the cutoff is **13:00**. Caffeine's half-life
-runs roughly six hours, so ten hours leaves a small enough fraction circulating
-to matter. Asking the user to pick a cutoff time directly would only get a guess.
+`computeCircadian` in `src/services/circadian.ts` rolls both to the next night
+once tonight's bedtime has passed. Each card carries a **live status badge**:
 
-The card shows the cutoff time and either the remaining window (`Xh Ym left`) or
-a passed state. Bedtime is read from MMKV (`StorageKeys.caffeineCutoff`,
-default `23`); no UI writes it yet.
+| Card | Before the deadline (green / indigo) | After (amber) |
+| --- | --- | --- |
+| Кава | `Кава дозволена ще 2г 15хв` | `Caffeine Cutoff: пийте лише воду / трав'яний чай` |
+| Digital Sunset | `Екрани вимкнути через 1г 40хв` | `Digital Sunset: час без екранів` |
 
-`computeCaffeineWindow` rolls the cutoff forward a day when it would otherwise
-land more than 18 hours in the past, so late/after-midnight bedtimes never
-produce a negative window.
+Recomputed every 30 s and on foreground, so "time remaining" stays honest.
 
-### Wind-down ritual
+### Sleep player + sleep timer (FE-401)
 
-Five steps, tickable, reset daily:
+`SleepPlayer` starts NSDR sessions or nature soundscapes through the shared audio
+engine (`react-native-track-player`). Playback continues with the screen locked
+and shows native lock-screen controls (title + play/pause); the now-playing bar
+mirrors play/pause even when it is toggled from the lock screen, via
+`addPlaybackListener`. See [audio.md](./audio.md).
 
-| Key | Step |
+The **sleep timer** (15 / 30 / 60 min) auto-stops playback, fading the volume out
+over the final 30 seconds. It is a delta-timestamp timer like the focus engine —
+`endAt` in MMKV, remaining derived — so it survives a reload; `src/services/sleepTimer.ts`.
+
+### Wind-down checklist (FE-402 AC2)
+
+Four keyed toggles, backed by the shared `ritual_completions` table (one tick per
+key per local day) via the existing ritual hooks — optimistic, with rollback:
+
+| Key | Toggle |
 | --- | --- |
-| `screens-off` | Screens down |
-| `lights-low` | Lights below eye level |
-| `temperature` | Room cooled |
-| `tomorrow` | Tomorrow written down |
-| `nsdr` | NSDR or breathing |
-
-**Rules:**
-
-- Steps are identified by **key, not index**, so reordering the list never
-  orphans history.
-- One tick per step per local day, enforced by a unique index on
-  `(ritual_key, local_date)`.
-- Toggling is **optimistic** via TanStack Query's `onMutate`, with rollback on
-  error — a checklist tap must not wait on disk.
-
-Written to: `ritual_completions` (SQLite).
-
-### NSDR
-
-Three guided tracks (10 / 20 / 30 minutes). Plays once, no looping, continues
-with the screen off. Requires a dev build and real URLs.
+| `air` | Провітрити кімнату |
+| `dim-lights` | Приглушити верхнє світло |
+| `water` | Випити води |
+| `phone-away` | Телефон на зарядку далеко від ліжка |
 
 ---
 

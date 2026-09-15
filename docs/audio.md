@@ -9,6 +9,7 @@
 - [The headless service](#the-headless-service)
 - [Content](#content)
 - [Platform configuration](#platform-configuration)
+- [The sleep timer (FE-401)](#the-sleep-timer-fe-401)
 - [Known risk: the New Architecture](#known-risk-the-new-architecture)
 - [Testing](#testing)
 
@@ -124,6 +125,9 @@ Go at bundle evaluation, before any fallback could run.
 | `resumePlayback()` | |
 | `stopPlayback()` | `reset()` — clears the queue *and* the notification |
 | `fadeOutAndStop(ms)` | 20-step volume ramp, then reset |
+| `togglePlayback()` | Play if paused, pause if playing — mirrors the lock-screen toggle |
+| `addPlaybackListener(fn)` | Subscribe to play/pause changes (incl. lock-screen); returns unsubscribe |
+| `getIsPlaying()` | Best-effort current state; `false` when audio is unavailable |
 
 Two details worth knowing:
 
@@ -212,6 +216,28 @@ android.permission.WAKE_LOCK
 
 `FOREGROUND_SERVICE_MEDIA_PLAYBACK` is required from Android 14 (API 34) onward;
 without it the service fails to start and playback dies on background.
+
+---
+
+## The sleep timer (FE-401)
+
+`src/services/sleepTimer.ts`. Auto-stops playback after 15 / 30 / 60 minutes,
+fading the volume out over the final 30 s so the room does not cut to silence.
+
+Same discipline as the focus engine: the source of truth is one absolute instant,
+`endAt` in MMKV, and the remaining time is `endAt − Date.now()`, so a reload shows
+the right value immediately. `reconcileSleepTimer()` re-arms the internal timeout
+on mount and on every foreground.
+
+The fade needs JS to run — it ramps the volume in steps — which it can while
+audio plays, because the OS keeps a background-audio app alive. If the app is
+suspended past `endAt` (audio paused *and* backgrounded), the next foreground
+reconciles and stops cleanly; there is nothing to fade in that case.
+
+**Lock-screen limitation.** The native lock screen shows the title and play/pause
+(FE-401 AC2), but a **sleep-timer countdown on the lock screen** is not something
+`react-native-track-player` exposes without a custom notification; the countdown
+lives in-app. The title + play/pause half of AC2 is fully native.
 
 ---
 
