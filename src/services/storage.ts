@@ -91,6 +91,10 @@ export const StorageKeys = {
   energyStore: 'store.energy',
   windDownProgress: 'sleep.windDown',
   caffeineCutoff: 'sleep.caffeineCutoff',
+  /** Target bedtime as minutes-from-midnight; drives the circadian widget (FE-402). */
+  sleepTarget: 'sleep.targetMinutes',
+  /** Active sleep-timer descriptor (FE-401). */
+  sleepTimer: 'sleep.timer',
   detoxSession: 'detox.activeSession',
   onboardingSeen: 'app.onboardingSeen',
 } as const;

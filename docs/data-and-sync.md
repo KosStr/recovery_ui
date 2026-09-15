@@ -169,6 +169,8 @@ StorageKeys = {
   energyStore:       'store.energy',
   windDownProgress:  'sleep.windDown',
   caffeineCutoff:    'sleep.caffeineCutoff',
+  sleepTarget:       'sleep.targetMinutes', // target bedtime (FE-402)
+  sleepTimer:        'sleep.timer',         // active sleep-timer descriptor (FE-401)
   detoxSession:      'detox.activeSession',
   onboardingSeen:    'app.onboardingSeen',
 }

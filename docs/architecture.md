@@ -213,8 +213,10 @@ stripe of dead space under every screen.
 | `src/services/timerEngine.ts` | Absolute-timestamp timers, pub/sub, `useCountdown`. See [timers.md](./timers.md) |
 | `src/services/storage.ts` | MMKV wrapper + in-memory fallback, `StorageKeys`, Zustand adapter |
 | `src/services/notifications.ts` | Permissions, Android channel, `scheduleAt`, cancellation |
-| `src/services/audioPlayer.ts` | Player setup, soundscapes, NSDR, fade-out. See [audio.md](./audio.md) |
+| `src/services/audioPlayer.ts` | Player setup, soundscapes, NSDR, fade-out, playback-state pub/sub. See [audio.md](./audio.md) |
 | `src/services/playbackService.ts` | Headless remote-control handler (lock screen, Bluetooth) |
+| `src/services/sleepTimer.ts` | Delta-timestamp sleep timer with fade-out (FE-401). See [audio.md](./audio.md#the-sleep-timer-fe-401) |
+| `src/services/circadian.ts` | Caffeine cutoff / digital sunset from target bedtime (FE-402) |
 | `src/db/localDb.ts` | Schema, migrations, all SQL. See [data-and-sync.md](./data-and-sync.md) |
 | `src/store/useEnergyStore.ts` | Zustand store + selector hooks |
 | `src/api/client.ts` | `apiFetch`, `ApiError`, base URL resolution, auth hook-in |
