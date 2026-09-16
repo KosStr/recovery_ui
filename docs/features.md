@@ -248,43 +248,49 @@ key per local day) via the existing ritual hooks — optimistic, with rollback:
 
 ## Детокс (Detox) — `app/(tabs)/detox.tsx`
 
-**Accent:** sage green `#7C9A83`
+**Accent:** sage green `#7C9A83`. EPIC 5 — «Глибокий офлайн», voluntary
+phone-down time meant to break the check-the-phone reflex. Ukrainian throughout.
 
-### Screen-free windows
+### Глибокий офлайн → Zen mode (FE-501)
 
-Three durations: **20 min**, **1 hour**, **3 hours**.
+Three durations — **20 / 30 / 60 хв**. Starting one inserts a `sessions` row
+(`type: 'detox'`), stops any audio, arms detox mode in Zustand, starts the shared
+delta-timestamp timer (one completion notification), and **pushes the full-screen
+Zen modal** (`app/modal/detox-zen.tsx`).
 
-Starting one:
+Zen mode is deliberately bare: a random analog quest, a white timer on true
+black, nothing to tap. It is **display-only** — the Detox tab, still mounted
+behind it, owns completion (the success haptic, clearing the timer), so nothing
+double-fires. Closing Zen (the small ✕) leaves the timer running; the tab shows
+its status and can reopen Zen or end early. Ending early fires a **warning**
+haptic, not a success.
 
-1. Inserts a `sessions` row (`type: 'detox'`).
-2. **Stops all audio** — a detox window with a soundscape still running is not
-   one.
-3. Arms detox mode in Zustand (`detoxArmed`, `detoxStartedAt`).
-4. Starts the timer, which schedules the single completion notification.
+### Flip-to-Detox (FE-501 AC2)
 
-While running, the screen shows only the countdown and a promise: *"We will send
-one notification when the window closes. Until then there is nothing to check."*
+`src/services/useFaceDown.ts` reads the accelerometer (`expo-sensors`): screen-up
+`z ≈ +1`, screen-down `z ≈ −1`, with hysteresis (enter past −0.8, leave above
+−0.6) so setting the phone down does not strobe. When **face down**, Zen mode
+renders a pure-black void and **releases keep-awake**, so the display sleeps and
+the OLED draws no power. The block still finishes on time — the timer is a
+persisted timestamp and the **OS notification carries the completion buzz even
+with the app asleep** (the "light vibration" of AC2). Flip up and the timer
+returns. The sensor is polled at 2 Hz and only while Zen mode is open; where it
+is unavailable (web, no sensor) flip-to-detox is simply skipped.
 
-Ending early fires a **warning** haptic rather than a success one, and releases
-detox mode.
+### Analog micro-quests (FE-501 AC1)
 
-### Analog micro-quests
-
-Six quests. One is featured, chosen by `new Date().getHours() % 6` — stable
-across re-renders, different each time the user comes back. The rest are listed
-below it.
+`src/components/detox/quests.ts`. A random quest is drawn at the start of each
+detox (`pickRandomQuest`); the first three are the ones the criteria name:
 
 | Quest | Point |
 | --- | --- |
-| Walk one block without headphones | Notice five sounds you cannot normally hear |
-| Write half a page by hand | Anything. Legibility optional |
-| Look at something 20 metres away | Let the ciliary muscle unclench |
-| Make a drink slowly | No podcast, no second screen |
-| Step outside and find the horizon | Panoramic vision lowers arousal |
-| Fix one small broken thing | The drawer, the button, the wobbly leg |
+| Зроби 10 повільних ковтків холодної води | Без телефону в руках |
+| Правило 20-20-20 | Точка за 6 м, 20 секунд |
+| Розтягни трапецію та шию | Повільно, плечі вниз |
+| …plus walk / write / horizon / fix-one-thing | Variety |
 
 **Every quest is deliberately unrecordable** — no photo, no log, nothing to post.
-A quest that produces a shareable artefact defeats the purpose.
+A quest that produces a shareable artefact just feeds the loop it breaks.
 
 ---
 

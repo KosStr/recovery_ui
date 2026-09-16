@@ -32,6 +32,7 @@ export { default as MoonStar } from 'lucide-react-native/icons/moon-star';
 export { default as Music } from 'lucide-react-native/icons/music';
 export { default as Pause } from 'lucide-react-native/icons/pause';
 export { default as PenLine } from 'lucide-react-native/icons/pen-line';
+export { default as PersonStanding } from 'lucide-react-native/icons/person-standing';
 export { default as Play } from 'lucide-react-native/icons/play';
 export { default as ShieldOff } from 'lucide-react-native/icons/shield-off';
 export { default as Smartphone } from 'lucide-react-native/icons/smartphone';
