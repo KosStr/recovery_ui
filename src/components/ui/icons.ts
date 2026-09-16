@@ -26,6 +26,7 @@ export { default as Leaf } from 'lucide-react-native/icons/leaf';
 export { default as Moon } from 'lucide-react-native/icons/moon';
 export { default as Pause } from 'lucide-react-native/icons/pause';
 export { default as PenLine } from 'lucide-react-native/icons/pen-line';
+export { default as PersonStanding } from 'lucide-react-native/icons/person-standing';
 export { default as Play } from 'lucide-react-native/icons/play';
 export { default as ShieldOff } from 'lucide-react-native/icons/shield-off';
 export { default as Smartphone } from 'lucide-react-native/icons/smartphone';

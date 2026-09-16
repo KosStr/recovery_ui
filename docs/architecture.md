@@ -150,7 +150,8 @@ app/
 │   ├── sleep.tsx            Sleep   — caffeine, wind-down, NSDR
 │   └── detox.tsx            Detox   — screen-free timer, micro-quests
 └── modal/
-    └── breathing.tsx        Fullscreen breathing session
+    ├── breathing.tsx        Fullscreen breathing session
+    └── detox-zen.tsx        Fullscreen "Глибокий офлайн" / flip-to-detox (FE-501)
 ```
 
 `(tabs)` is a **route group**: the parentheses mean it organises files without
@@ -211,6 +212,8 @@ stripe of dead space under every screen.
 | File | Responsibility |
 | --- | --- |
 | `src/services/timerEngine.ts` | Absolute-timestamp timers, pub/sub, `useCountdown`. See [timers.md](./timers.md) |
+| `src/services/useFaceDown.ts` | Accelerometer flip-detection for detox Zen mode (FE-501) |
+| `src/components/detox/quests.ts` | Analog micro-quests + `pickRandomQuest` (FE-501) |
 | `src/services/storage.ts` | MMKV wrapper + in-memory fallback, `StorageKeys`, Zustand adapter |
 | `src/services/notifications.ts` | Permissions, Android channel, `scheduleAt`, cancellation |
 | `src/services/audioPlayer.ts` | Player setup, soundscapes, NSDR, fade-out. See [audio.md](./audio.md) |

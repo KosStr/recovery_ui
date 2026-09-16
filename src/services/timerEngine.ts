@@ -49,8 +49,8 @@ const NOTIFICATION_COPY: Record<TimerKind, { title: string; body: string }> = {
     body: 'Twenty minutes of recovery banked. Ready for the next block?',
   },
   detox: {
-    title: 'Screen-free window finished',
-    body: 'You stayed off the glass. Log how it felt.',
+    title: 'Детокс завершено',
+    body: 'Ви протрималися без екрана. Поверніться, коли будете готові.',
   },
   winddown: {
     title: 'Wind-down starts now',

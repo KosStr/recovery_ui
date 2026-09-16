@@ -121,6 +121,16 @@ export default function RootLayout() {
                     gestureEnabled: true,
                   }}
                 />
+                <Stack.Screen
+                  name="modal/detox-zen"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'fade',
+                    // No swipe-down: the point is to put the phone down, not to
+                    // keep a gesture one flick from ending the session.
+                    gestureEnabled: false,
+                  }}
+                />
               </Stack>
               <StatusBar style="light" />
             </View>
