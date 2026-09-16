@@ -50,8 +50,8 @@ const NOTIFICATION_COPY: Record<TimerKind, { title: string; body: string }> = {
     body: 'Готові до наступного блоку фокусу?',
   },
   detox: {
-    title: 'Screen-free window finished',
-    body: 'You stayed off the glass. Log how it felt.',
+    title: 'Детокс завершено',
+    body: 'Ви протрималися без екрана. Поверніться, коли будете готові.',
   },
   winddown: {
     title: 'Wind-down starts now',
